@@ -26,7 +26,7 @@ namespace MotionWallpaper
 
         private Timer generateTimer;
 
-        private Random r = new Random();
+        private Random r;
 
         private int startY = 0;
 
@@ -34,7 +34,13 @@ namespace MotionWallpaper
 
         private List<Entity> entities;
 
-        private string[] randomStr = { "￥", "$", "888", "666" };
+        private string[] randomStr = { "￥10", "￥20", "￥50", "￥100" };
+
+        private SharpDX.DirectWrite.Factory fc;
+
+        private TextFormat formatFlow;
+
+        private TextFormat formatTime;
 
         public Size Size
         {
@@ -53,6 +59,9 @@ namespace MotionWallpaper
 
         public AppContext()
         {
+            long tick = DateTime.Now.Ticks;
+            r = new Random((int)(tick & 0xffffffffL) | (int)(tick >> 32));
+
             entities = new List<Entity>();
 
             refreshTimer = new Timer();
@@ -80,6 +89,20 @@ namespace MotionWallpaper
             generateTimer.Interval = 100;
             generateTimer.Start();
 
+            fc = new SharpDX.DirectWrite.Factory();
+
+            formatFlow = new TextFormat(fc, "微软雅黑", 18)
+            {
+                TextAlignment = TextAlignment.Center,
+                ParagraphAlignment = ParagraphAlignment.Center
+            };
+
+            formatTime = new TextFormat(fc, "微软雅黑", 28)
+            {
+                TextAlignment = TextAlignment.Center,
+                ParagraphAlignment = ParagraphAlignment.Center
+            };
+
             Application.ApplicationExit += Application_ApplicationExit;
         }
 
@@ -90,6 +113,21 @@ namespace MotionWallpaper
 
         private void Application_ApplicationExit(object sender, EventArgs e)
         {
+            if (formatFlow != null)
+            {
+                formatFlow.Dispose();
+            }
+
+            if (formatTime != null)
+            {
+                formatTime.Dispose();
+            }
+
+            if (fc != null)
+            {
+                fc.Dispose();
+            }
+
             ReleaseDeviceContext();
             CloseWin();
 
@@ -97,12 +135,26 @@ namespace MotionWallpaper
 
         private void GenerateTimer_Tick(object sender, EventArgs e)
         {
-            int index = r.Next(randomStr.Length);
             entities.RemoveAll(s => s.Location.Y >= Screen.PrimaryScreen.WorkingArea.Height);
-            Entity entity = new Entity();
-            entity.Value = randomStr[index];
-            entity.Location = new PointF(r.Next(Screen.PrimaryScreen.WorkingArea.Width), 0);
-            entities.Add(entity);
+            for (int i = 0; i < 10; i++)
+            {
+                int x = r.Next(0, Screen.PrimaryScreen.WorkingArea.Width);
+                int y = r.Next(-10, -1);
+
+                Entity entity = new Entity();
+                entity.Value = "*"; //sb.ToString();
+                entity.Location = new PointF(x, y);
+                entities.Add(entity);
+            }
+
+            int x2 = r.Next(0, Screen.PrimaryScreen.WorkingArea.Width);
+            int y2 = r.Next(-10, -1);
+            var index = r.Next(randomStr.Length);
+
+            var entity2 = new Entity();
+            entity2.Value = randomStr[index];
+            entity2.Location = new PointF(x2, y2);
+            entities.Add(entity2);
         }
 
 
@@ -121,18 +173,16 @@ namespace MotionWallpaper
                     reStart = true;
                 }
                 startY++;
-                SharpDX.DirectWrite.Factory fc = new SharpDX.DirectWrite.Factory();
-                TextFormat format = new TextFormat(fc, "微软雅黑", 28)
-                {
-                    TextAlignment = TextAlignment.Center,
-                    ParagraphAlignment = ParagraphAlignment.Center
-                };
-                TextLayout layout = new TextLayout(fc, DateTime.Now.ToString(), format, Size.Width, Size.Height);
+                
+                
+                TextLayout layout = new TextLayout(fc, DateTime.Now.ToString(), formatTime, Size.Width, Size.Height);
                 SolidColorBrush textBrush = new SolidColorBrush(renderTarget, System.Drawing.Color.White.ToDXColor4());
+
                 try
                 {
                     renderTarget.BeginDraw();
                     renderTarget.Clear(ColorHelper.ToDXColor4(System.Drawing.Color.Black));
+
                     //for (int i = 0; i < 10; i++)
                     //{
                     //    SharpDX.RectangleF rect2 = new SharpDX.RectangleF(r.Next(this.Size.Width), startY, 100, 100);
@@ -146,6 +196,8 @@ namespace MotionWallpaper
 
                     //SharpDX.RectangleF textrect = new SharpDX.RectangleF(0f, 0f, this.Size.Width, this.Size.Height);
 
+                    
+
                     renderTarget.DrawTextLayout(new RawVector2(0f, 0f), layout, textBrush);
 
                     for (int i = 0; i < _entities.Count; i++)
@@ -153,9 +205,9 @@ namespace MotionWallpaper
                         var _loc = _entities[i].Location;
                         if (entities.Count() > i)
                         {
-                            entities[i].Location = new PointF(_loc.X, _loc.Y + 9);
+                            entities[i].Location = new PointF(_loc.X, _loc.Y + 6);
                         }
-                        TextLayout _layout = new TextLayout(fc, _entities[i].Value, format, 30, 30);
+                        TextLayout _layout = new TextLayout(fc, _entities[i].Value, formatFlow, 80, 30);
                         renderTarget.DrawTextLayout(new RawVector2(_entities[i].Location.X, _entities[i].Location.Y), _layout, textBrush);
                         _layout.Dispose();
                     }
@@ -173,8 +225,8 @@ namespace MotionWallpaper
                 finally
                 {
                     layout.Dispose();
-                    format.Dispose();
-                    fc.Dispose();
+                    //format.Dispose();
+                    //fc.Dispose();
                     textBrush.Dispose();
                 }
             }
