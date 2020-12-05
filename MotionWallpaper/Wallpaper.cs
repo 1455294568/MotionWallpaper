@@ -1,24 +1,23 @@
-﻿using SharpDX;
+﻿using MotionWallpaper.Models;
+using SharpDX;
 using SharpDX.Direct2D1;
 using SharpDX.DirectWrite;
 using SharpDX.Mathematics.Interop;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.ComponentModel;
+using System.Data;
 using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using MotionWallpaper.Models;
 
 namespace MotionWallpaper
 {
-    public class AppContext : ApplicationContext
+    public partial class Wallpaper : Form
     {
         private static bool isDxInit;
-
-        private Form mainForm;
 
         private WindowRenderTarget renderTarget;
 
@@ -42,23 +41,10 @@ namespace MotionWallpaper
 
         private TextFormat formatTime;
 
-        public Size Size
+        public Wallpaper()
         {
-            get { return Screen.PrimaryScreen.Bounds.Size; }
-        }
+            InitializeComponent();
 
-        public int Width
-        {
-            get { return Screen.PrimaryScreen.Bounds.Width; }
-        }
-
-        public int Height
-        {
-            get { return Screen.PrimaryScreen.Bounds.Height; }
-        }
-
-        public AppContext()
-        {
             long tick = DateTime.Now.Ticks;
             r = new Random((int)(tick & 0xffffffffL) | (int)(tick >> 32));
 
@@ -78,7 +64,6 @@ namespace MotionWallpaper
             icon.ContextMenu = menu;
             icon.Visible = true;
 
-            InitWin();
             InitDeviceContext();
 
             refreshTimer.Tick += Timer_Tick;
@@ -102,36 +87,9 @@ namespace MotionWallpaper
                 TextAlignment = TextAlignment.Center,
                 ParagraphAlignment = ParagraphAlignment.Center
             };
-
-            Application.ApplicationExit += Application_ApplicationExit;
         }
 
-        private void ExitMenu_Click(object sender, EventArgs e)
-        {
-            Application.Exit();
-        }
-
-        private void Application_ApplicationExit(object sender, EventArgs e)
-        {
-            if (formatFlow != null)
-            {
-                formatFlow.Dispose();
-            }
-
-            if (formatTime != null)
-            {
-                formatTime.Dispose();
-            }
-
-            if (fc != null)
-            {
-                fc.Dispose();
-            }
-
-            ReleaseDeviceContext();
-            CloseWin();
-
-        }
+        
 
         private void GenerateTimer_Tick(object sender, EventArgs e)
         {
@@ -157,7 +115,6 @@ namespace MotionWallpaper
             entities.Add(entity2);
         }
 
-
         private void Timer_Tick(object sender, EventArgs e)
         {
             var _entities = new List<Entity>(entities);
@@ -173,30 +130,15 @@ namespace MotionWallpaper
                     reStart = true;
                 }
                 startY++;
-                
-                
-                TextLayout layout = new TextLayout(fc, DateTime.Now.ToString(), formatTime, Size.Width, Size.Height);
+
+
+                TextLayout layout = new TextLayout(fc, DateTime.Now.ToString(), formatTime, SSize.Width, SSize.Height);
                 SolidColorBrush textBrush = new SolidColorBrush(renderTarget, System.Drawing.Color.White.ToDXColor4());
 
                 try
                 {
                     renderTarget.BeginDraw();
                     renderTarget.Clear(ColorHelper.ToDXColor4(System.Drawing.Color.Black));
-
-                    //for (int i = 0; i < 10; i++)
-                    //{
-                    //    SharpDX.RectangleF rect2 = new SharpDX.RectangleF(r.Next(this.Size.Width), startY, 100, 100);
-                    //    RoundedRectangle roundedRectangle = new RoundedRectangle();
-                    //    roundedRectangle.RadiusX = 4;
-                    //    roundedRectangle.RadiusY = 4;
-                    //    roundedRectangle.Rect = rect2;
-                    //    var fillBrush2 = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, ColorHelper.ToDXColor4(System.Drawing.Color.White));
-                    //    renderTarget.DrawRoundedRectangle(roundedRectangle, fillBrush2);
-                    //}
-
-                    //SharpDX.RectangleF textrect = new SharpDX.RectangleF(0f, 0f, this.Size.Width, this.Size.Height);
-
-                    
 
                     renderTarget.DrawTextLayout(new RawVector2(0f, 0f), layout, textBrush);
 
@@ -232,110 +174,9 @@ namespace MotionWallpaper
             }
         }
 
-        private void ReCreatDX()
+        public Size SSize
         {
-            ReleaseDeviceContext();
-            InitDeviceContext();
-        }
-
-        private void InitWin()
-        {
-            // Fetch the Progman window
-            IntPtr progman = W32.FindWindow("Progman", null);
-            IntPtr result = IntPtr.Zero;
-            IntPtr workerw = IntPtr.Zero;
-            IntPtr progmanPrev = IntPtr.Zero;
-
-            progmanPrev = W32.GetWindow(progman, W32.GetWindowType.GW_HWNDPREV);
-
-            // Send 0x052C to Progman. This message directs Progman to spawn a 
-            // WorkerW behind the desktop icons. If it is already there, nothing 
-            // happens.
-
-            W32.SendMessageTimeout(progman,
-                                       0x052C,
-                                       new IntPtr(0),
-                                       IntPtr.Zero,
-                                       W32.SendMessageTimeoutFlags.SMTO_NORMAL,
-                                       1000,
-                                       out result);
-
-            // Spy++ output
-            // .....
-            // 0x00010190 "" WorkerW
-            //   ...
-            //   0x000100EE "" SHELLDLL_DefView
-            //     0x000100F0 "FolderView" SysListView32
-            // 0x00100B8A "" WorkerW       <-- This is the WorkerW instance we are after!
-            // 0x000100EC "Program Manager" Progman
-
-            // We enumerate all Windows, until we find one, that has the SHELLDLL_DefView 
-            // as a child. 
-            // If we found that window, we take its next sibling and assign it to workerw.
-            var ret = W32.EnumWindows(new W32.EnumWindowsProc((tophandle, topparamhandle) =>
-            {
-                IntPtr p = W32.FindWindowEx(tophandle,
-                                            IntPtr.Zero,
-                                            "SHELLDLL_DefView",
-                                            null);
-
-                if (p != IntPtr.Zero)
-                {
-                    // Gets the WorkerW Window after the current one.
-                    workerw = W32.FindWindowEx(IntPtr.Zero,
-                                               tophandle,
-                                               "WorkerW",
-                                               null);
-                }
-
-                return true;
-            }), IntPtr.Zero);
-
-#if false
-
-            // Get the Device Context of the WorkerW
-            IntPtr dc = W32.GetDCEx(workerw, IntPtr.Zero, (W32.DeviceContextValues)0x403);
-            if (dc != IntPtr.Zero)
-            {
-                // Create a Graphics instance from the Device Context
-                using (Graphics g = Graphics.FromHdc(dc))
-                {
-
-                    // Use the Graphics instance to draw a white rectangle in the upper 
-                    // left corner. In case you have more than one monitor think of the 
-                    // drawing area as a rectangle that spans across all monitors, and 
-                    // the 0,0 coordinate being in the upper left corner.
-
-                    //Font font = new Font("Arial", 28, GraphicsUnit.Pixel);
-                    //SolidBrush brush = new SolidBrush(Color.Black);
-
-                    //var timeStr = DateTime.Now.ToString("HH:mm:ss");
-                    //var screenSize = Screen.PrimaryScreen.Bounds.Size;
-                    //var fontSize = g.MeasureString(timeStr, font);
-
-                    //g.FillRectangle(new SolidBrush(System.Drawing.Color.DarkGreen), 0, 0, Screen.PrimaryScreen.Bounds.Width, Screen.PrimaryScreen.Bounds.Height);
-
-                    //g.DrawString(timeStr, font, brush, screenSize.Width / 2 - fontSize.Width / 2, screenSize.Height / 2 - fontSize.Height / 2);
-
-                    //font.Dispose();
-
-                }
-
-                // make sure to release the device context after use.
-                W32.ReleaseDC(workerw, dc);
-            }
-#endif
-
-
-            mainForm = new Form();
-            mainForm.Load += new EventHandler((s, e) => {
-
-                mainForm.FormBorderStyle = FormBorderStyle.None;
-                mainForm.Bounds = Screen.PrimaryScreen.Bounds;
-                W32.ShowWindow(workerw, 0);
-                //W32.SetParent(mainForm.Handle, progmanPrev);
-            });
-            mainForm.Show();
+            get { return Screen.PrimaryScreen.Bounds.Size; }
         }
 
         private void InitDeviceContext()
@@ -346,8 +187,8 @@ namespace MotionWallpaper
                 try
                 {
                     HwndRenderTargetProperties hwndRenderTargetProperties = new HwndRenderTargetProperties();
-                    hwndRenderTargetProperties.Hwnd = mainForm.Handle;
-                    hwndRenderTargetProperties.PixelSize = new SharpDX.Size2(Screen.PrimaryScreen.Bounds.Width, Screen.PrimaryScreen.Bounds.Height);
+                    hwndRenderTargetProperties.Hwnd = this.Handle;
+                    hwndRenderTargetProperties.PixelSize = new SharpDX.Size2(SSize.Width, SSize.Height);
                     hwndRenderTargetProperties.PresentOptions = 0;
                     HwndRenderTargetProperties properties = hwndRenderTargetProperties;
                     RenderTargetProperties val2 = new RenderTargetProperties();
@@ -370,6 +211,17 @@ namespace MotionWallpaper
             }
         }
 
+        private void ReCreatDX()
+        {
+            ReleaseDeviceContext();
+            InitDeviceContext();
+        }
+
+        private void ExitMenu_Click(object sender, EventArgs e)
+        {
+            Application.Exit();
+        }
+
         private void ReleaseDeviceContext()
         {
             if (isDxInit)
@@ -380,11 +232,6 @@ namespace MotionWallpaper
                 }
                 isDxInit = false;
             }
-        }
-
-        private void CloseWin()
-        {
-            mainForm.Close();
         }
     }
 }

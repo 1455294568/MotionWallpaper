@@ -73,6 +73,12 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="W32.cs" />
+    <Compile Include="Wallpaper.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Wallpaper.Designer.cs">
+      <DependentUpon>Wallpaper.cs</DependentUpon>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
